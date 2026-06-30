@@ -107,6 +107,29 @@ body {
 .type-cell .lbl { font-size:11px; color:var(--muted); }
 .type-cell .v { font-size:15px; font-weight:700; color:var(--navy); }
 .type-cell .s { font-size:11px; color:var(--muted); }
+.pie-layout { display:grid; grid-template-columns: 280px 1fr; gap:16px; align-items:center; }
+.pie-chart {
+  width:220px; height:220px; margin:0 auto; border-radius:50%;
+  background:#e4e8ee; position:relative;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
+}
+.pie-chart::after {
+  content:""; position:absolute; inset:28px; background:#fff; border-radius:50%;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.pie-chart .center {
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:1; text-align:center; padding:0 40px;
+}
+.pie-chart .center .label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+.pie-chart .center .value { font-size:22px; font-weight:700; color:var(--navy); line-height:1.1; margin-top:4px; }
+.pie-chart .center .sub { font-size:11px; color:var(--muted); margin-top:2px; }
+.pie-legend { display:grid; gap:8px; }
+.pie-legend .item { display:grid; grid-template-columns: 14px 1fr auto; gap:10px; align-items:center; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:#f8fafc; }
+.pie-legend .sw { width:14px; height:14px; border-radius:4px; }
+.pie-legend .name { font-size:12px; color:var(--navy); font-weight:600; }
+.pie-legend .meta { font-size:11px; color:var(--muted); margin-top:2px; }
+.pie-legend .val { text-align:right; font-size:12px; font-weight:700; color:var(--navy); }
 /* Funnel/stepper */
 .stepper { display:flex; flex-wrap:wrap; gap:6px; }
 .step { background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid var(--border); min-width:120px; flex:1; position:relative; }
@@ -328,18 +351,6 @@ table.data td.link { color:var(--court); font-weight:600; }
           <button class="btn primary">Янгилаш</button>
         </div>
       </div>
-      <div class="filters">
-        <div class="f"><label>Бошланиш санаси</label><input type="date" value="2026-06-01"></div>
-        <div class="f"><label>Тугаш санаси</label><input type="date" value="2026-06-30"></div>
-        <div class="f"><label>Филиал</label><select id="fBranch"></select></div>
-        <div class="f"><label>Кредит тури</label><select id="fType"></select></div>
-        <div class="f"><label>Қарздорлик ҳолати</label><select id="fBucket"></select></div>
-        <div class="f"><label>Суд/МИБ/Аукцион</label><select><option>Барчаси</option><option>Суд</option><option>МИБ</option><option>Аукцион</option></select></div>
-        <div class="f"><label>Масъул</label><select><option>Барчаси</option><option>А.Каримов</option><option>М.Йўлдошева</option><option>Ж.Раҳимов</option></select></div>
-        <button class="btn primary">Қўллаш</button>
-        <button class="btn">Тозалаш</button>
-      </div>
-
       <div class="kpi-grid" id="kpiGrid"></div>
 
       <div class="charts-grid">
@@ -393,20 +404,27 @@ table.data td.link { color:var(--court); font-weight:600; }
           </div>
         </div>
       </div>
-
-      <div class="card">
-        <h3>Кредитлар реестри <span class="hint" id="tableHint">— Барча шартномалар</span></h3>
-        <div class="table-wrap" style="border:none;">
-          <table class="data" id="dashTable"></table>
-        </div>
-      </div>
     </section>
 
     <!-- ============== REGISTRY ============== -->
     <section class="section" id="sec-registry">
       <div class="page-title"><h1>Кредитлар реестри</h1><div class="actions"><button class="btn">Excel</button><button class="btn primary">Янги қидирув</button></div></div>
+      <div class="filters">
+        <div class="f"><label>Бошланиш санаси</label><input type="date" id="fStartDate" value="2026-06-01"></div>
+        <div class="f"><label>Тугаш санаси</label><input type="date" id="fEndDate" value="2026-06-30"></div>
+        <div class="f"><label>Филиал</label><select id="fBranch"></select></div>
+        <div class="f"><label>Кредит тури</label><select id="fType"></select></div>
+        <div class="f"><label>Қарздорлик ҳолати</label><select id="fBucket"></select></div>
+        <div class="f"><label>Суд/МИБ/Аукцион</label><select id="fStage"><option>Барчаси</option><option>Суд</option><option>МИБ</option><option>Аукцион</option></select></div>
+        <div class="f"><label>Масъул</label><select id="fOwner"></select></div>
+        <button class="btn primary" id="applyRegistryFilters" onclick="applyRegistryFilters({smooth:true})">Қўллаш</button>
+        <button class="btn" id="resetRegistryFilters" onclick="resetRegistryFilters()">Тозалаш</button>
+      </div>
       <div class="card">
-        <table class="data" id="regTable"></table>
+        <h3>Кредитлар реестри <span class="hint" id="tableHint">— Барча шартномалар</span></h3>
+        <div class="table-wrap" style="border:none;">
+          <table class="data" id="regTable"></table>
+        </div>
       </div>
     </section>
 
@@ -774,29 +792,151 @@ function fillSelect(id, opts, first="Барчаси"){
   el.innerHTML = `<option>${first}</option>` + opts.map(o=>`<option>${o}</option>`).join('');
 }
 
+const PIE_COLORS = ["#9aa3af","#E5A50A","#E67E22","#C0392B","#7b1d12","#7E3FBF","#2F6FDB","#123C69","#1E8449","#C8922A","#243759","#48a999"];
+const registryState = { kpiIndex: null, search: "" };
+
+function buildPieChartMarkup(items, totalLabel, totalValue, formatter){
+  const total = items.reduce((sum, item) => sum + item.value, 0) || 1;
+  let current = 0;
+  const slices = items.map((item, index) => {
+    const start = current / total * 360;
+    current += item.value;
+    const end = current / total * 360;
+    return `${item.color} ${start}deg ${end}deg`;
+  }).join(', ');
+
+  return `
+    <div class="pie-layout">
+      <div class="pie-chart" style="background:conic-gradient(${slices})">
+        <div class="center">
+          <div class="label">${totalLabel}</div>
+          <div class="value">${totalValue}</div>
+          <div class="sub">${items.length} та сегмент</div>
+        </div>
+      </div>
+      <div class="pie-legend">
+        ${items.map(item => `
+          <div class="item">
+            <span class="sw" style="background:${item.color}"></span>
+            <div>
+              <div class="name">${item.label}</div>
+              <div class="meta">${formatter(item)}</div>
+            </div>
+            <div class="val">${Math.round(item.value / total * 100)}%</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function parseDateVal(value){
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getRegistryFilterFn(){
+  const branch = document.getElementById('fBranch')?.value || 'Барчаси';
+  const type = document.getElementById('fType')?.value || 'Барчаси';
+  const bucket = document.getElementById('fBucket')?.value || 'Барчаси';
+  const stage = document.getElementById('fStage')?.value || 'Барчаси';
+  const owner = document.getElementById('fOwner')?.value || 'Барчаси';
+  const start = parseDateVal(document.getElementById('fStartDate')?.value);
+  const end = parseDateVal(document.getElementById('fEndDate')?.value);
+  const search = registryState.search.trim().toLowerCase();
+
+  return c => {
+    if (branch !== 'Барчаси' && c.branch !== branch) return false;
+    if (type !== 'Барчаси' && c.type !== type) return false;
+    if (bucket !== 'Барчаси' && c.bucket !== bucket) return false;
+    if (owner !== 'Барчаси' && c.staff !== owner) return false;
+    if (stage === 'Суд' && c.court === '—') return false;
+    if (stage === 'МИБ' && c.mib === '—') return false;
+    if (stage === 'Аукцион' && c.auc === '—') return false;
+    if (start || end) {
+      const lastAct = parseDateVal(c.lastAct);
+      if (start && (!lastAct || lastAct < start)) return false;
+      if (end && (!lastAct || lastAct > end)) return false;
+    }
+    if (registryState.kpiIndex !== null) {
+      if (registryState.kpiIndex === 4 && c.bucket !== 'Суд') return false;
+      if (registryState.kpiIndex === 5 && c.bucket !== 'МИБ') return false;
+      if ([6,7,8].includes(registryState.kpiIndex) && c.bucket !== 'Аукцион') return false;
+      if (registryState.kpiIndex === 1 && !['30+','60+'].includes(c.bucket)) return false;
+      if (registryState.kpiIndex === 9 && c.bucket === 'Жорий') return false;
+    }
+    if (search && ![c.name, c.id, c.phone].some(v => String(v).toLowerCase().includes(search))) return false;
+    return true;
+  };
+}
+
+function updateRegistryHint(){
+  const parts = [];
+  const kpi = registryState.kpiIndex !== null ? KPIS[registryState.kpiIndex] : null;
+  if (kpi) parts.push(kpi.label);
+  if (registryState.search) parts.push(`Қидирув: "${registryState.search}"`);
+  if (!parts.length) parts.push('Барча шартномалар');
+  document.getElementById('tableHint').textContent = `— ${parts.join(' • ')}`;
+}
+
+function applyRegistryFilters(options = {}){
+  renderContractsTable('regTable', getRegistryFilterFn());
+  updateRegistryHint();
+  if (options.smooth) {
+    document.getElementById('regTable').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+}
+
+function resetRegistryFilters(){
+  document.getElementById('fStartDate').value = '2026-06-01';
+  document.getElementById('fEndDate').value = '2026-06-30';
+  document.getElementById('fBranch').selectedIndex = 0;
+  document.getElementById('fType').selectedIndex = 0;
+  document.getElementById('fBucket').selectedIndex = 0;
+  document.getElementById('fStage').selectedIndex = 0;
+  document.getElementById('fOwner').selectedIndex = 0;
+  registryState.kpiIndex = null;
+  registryState.search = "";
+  const searchEl = document.getElementById('globalSearch');
+  if (searchEl) searchEl.value = "";
+  applyRegistryFilters({smooth:true});
+}
+
+function initRegistryFilters(){
+  fillSelect('fOwner', [...new Set(CONTRACTS.map(c => c.staff))]);
+}
+
 function renderBucketBars(){
-  const data = (APP_DATA.bucketStats || []).map(d=>({ b: d.bucket, c: d.count, a: d.amount }));
-  const max = Math.max(...data.map(d=>d.c));
-  const colors = {"Жорий":"#9aa3af","30+":"#E5A50A","60+":"#E67E22","90+":"#C0392B","180+":"#7b1d12","365+":"#7E3FBF","Суд":"#2F6FDB","МИБ":"#123C69","Аукцион":"#1E8449"};
-  document.getElementById('bucketBars').innerHTML = data.map(d=>`
-    <div class="bar-row">
-      <div><span class="badge ${BUCKET_BADGE[d.b]}">${d.b}</span></div>
-      <div class="bar"><span style="width:${(d.c/max*100)||4}%; background:${colors[d.b]}"></span></div>
-      <div class="cnt">${d.c}</div>
-      <div class="amt">${(d.a/1e9).toFixed(2)} млрд</div>
-    </div>`).join('');
+  const data = (APP_DATA.bucketStats || []).map((d, index)=>({
+    label: d.bucket,
+    value: d.count,
+    amount: d.amount,
+    color: PIE_COLORS[index % PIE_COLORS.length]
+  }));
+  const totalCount = data.reduce((sum, item) => sum + item.value, 0).toLocaleString('ru-RU');
+  document.getElementById('bucketBars').innerHTML = buildPieChartMarkup(
+    data,
+    'Жами контракт',
+    totalCount,
+    item => `${item.value.toLocaleString('ru-RU')} та • ${(item.amount/1e9).toFixed(2)} млрд сўм`
+  );
 }
 
 function renderTypeGrid(){
-  const tg = document.getElementById('typeGrid');
-  tg.innerHTML = (APP_DATA.typeStats || []).map((item,i)=>{
-    const colors = ["#1B2A4A","#C8922A","#2F6FDB","#1E8449","#C0392B","#7E3FBF","#E67E22"];
-    return `<div class="type-cell" style="border-left-color:${colors[i]}">
-      <div class="lbl">${item.type}</div>
-      <div class="v">${item.count} та</div>
-      <div class="s">${(item.amount/1e9).toFixed(2)} млрд сўм</div>
-    </div>`;
-  }).join('');
+  const data = (APP_DATA.typeStats || []).map((item, index)=>({
+    label: item.type,
+    value: item.amount,
+    count: item.count,
+    color: PIE_COLORS[index % PIE_COLORS.length]
+  }));
+  const totalAmount = `${(data.reduce((sum, item) => sum + item.value, 0) / 1e9).toFixed(2)} млрд`;
+  document.getElementById('typeGrid').innerHTML = buildPieChartMarkup(
+    data,
+    'Жами сумма',
+    totalAmount,
+    item => `${item.count.toLocaleString('ru-RU')} та • ${(item.value/1e9).toFixed(2)} млрд сўм`
+  );
 }
 
 function renderHeatmap(){
@@ -1142,15 +1282,9 @@ document.querySelectorAll('#menu a').forEach(a=>{
 /* ============ KPI FILTER ============ */
 function filterByKPI(i){
   const k = KPIS[i];
-  let filter = null; let hint = `— ${k.label}`;
-  if (i===4) filter = c=>c.bucket==="Суд";
-  else if (i===5) filter = c=>c.bucket==="МИБ";
-  else if (i===6||i===7||i===8) filter = c=>c.bucket==="Аукцион";
-  else if (i===1) filter = c=>["30+","60+"].includes(c.bucket);
-  else if (i===9) filter = c=>c.bucket!=="Жорий";
-  document.getElementById('tableHint').textContent = hint;
-  renderContractsTable('dashTable', filter);
-  document.getElementById('dashTable').scrollIntoView({behavior:'smooth', block:'start'});
+  registryState.kpiIndex = i;
+  navigate('registry');
+  applyRegistryFilters({smooth:true});
   toast(`Жадвал филтрланди: ${k.label}`,'success');
 }
 
@@ -1210,9 +1344,8 @@ document.getElementById('roleSelect').addEventListener('change', e=>{
 /* ============ SEARCH ============ */
 document.getElementById('globalSearch').addEventListener('input', e=>{
   const q = e.target.value.toLowerCase().trim();
-  if (!q){ renderContractsTable('dashTable'); document.getElementById('tableHint').textContent="— Барча шартномалар"; return; }
-  renderContractsTable('dashTable', c=>(c.name.toLowerCase().includes(q)||c.id.toLowerCase().includes(q)||c.phone.includes(q)));
-  document.getElementById('tableHint').textContent = `— Қидирув: "${q}"`;
+  registryState.search = q;
+  applyRegistryFilters();
 });
 
 /* ============ CALL CENTER TABLE ============ */
@@ -1450,6 +1583,7 @@ document.querySelectorAll('#sec-ai .subnav button').forEach(b=>{
 fillSelect('fBranch', BRANCHES);
 fillSelect('fType', TYPES);
 fillSelect('fBucket', BUCKETS);
+initRegistryFilters();
 fillSelect('branchTop', BRANCHES);
 fillSelect('wlBranch', BRANCHES);
 fillSelect('fAudBr', BRANCHES);
@@ -1459,8 +1593,7 @@ renderTypeGrid();
 renderHeatmap();
 renderFunnels();
 renderRecovery();
-renderContractsTable('dashTable');
-renderContractsTable('regTable');
+applyRegistryFilters();
 renderCallTable();
 renderAI('queue');
 renderCollateral();
