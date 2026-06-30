@@ -1,0 +1,51 @@
+name: Deploy to Zoboto
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout collection_crm
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_BASE_URL: /prototypes/trastbank-pmo/collection_crm/
+
+      - name: Checkout zoboto repo
+        uses: actions/checkout@v4
+        with:
+          repository: zokirovbobur/zoboto
+          token: ${{ secrets.ZOBOTO_DEPLOY_TOKEN }}
+          path: zoboto
+
+      - name: Sync built files
+        run: |
+          DEST=zoboto/prototypes/trastbank-pmo/collection_crm
+          rm -rf "$DEST"
+          mkdir -p "$DEST"
+          cp -r dist/. "$DEST/"
+
+      - name: Commit and push
+        run: |
+          cd zoboto
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add prototypes/trastbank-pmo/collection_crm
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "sync(collection_crm): auto-sync from collection_crm repo [main]"
+          git push
