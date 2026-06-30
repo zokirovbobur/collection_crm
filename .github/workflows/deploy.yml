@@ -2,7 +2,7 @@ name: Deploy to Zoboto
 
 on:
   push:
-    branches: [main]
+    branches: [main, test]
 
 jobs:
   build-and-sync:
@@ -31,6 +31,7 @@ jobs:
         with:
           repository: zokirovbobur/zoboto
           token: ${{ secrets.ZOBOTO_DEPLOY_TOKEN }}
+          ref: ${{ github.ref_name }}
           path: zoboto
 
       - name: Sync built files
@@ -47,5 +48,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add prototypes/trastbank-pmo/collection_crm
           git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "sync(collection_crm): auto-sync from collection_crm repo [main]"
+          git commit -m "sync(collection_crm): auto-sync from collection_crm repo [${{ github.ref_name }}]"
           git push
