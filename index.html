@@ -107,12 +107,13 @@ body {
 .type-cell .lbl { font-size:11px; color:var(--muted); }
 .type-cell .v { font-size:15px; font-weight:700; color:var(--navy); }
 .type-cell .s { font-size:11px; color:var(--muted); }
-.pie-layout { display:grid; justify-items:center; gap:14px; min-height:280px; }
-.pie-svg { width:100%; max-width:360px; height:auto; overflow:visible; }
+.pie-layout { display:grid; justify-items:center; gap:14px; min-height:260px; }
+.pie-svg { width:100%; max-width:320px; height:auto; overflow:visible; }
 .pie-slice { cursor:pointer; transition:opacity .15s ease, transform .15s ease; transform-origin:50% 50%; }
 .pie-slice:hover { opacity:.9; }
 .pie-hole { fill:#fff; stroke:var(--border); stroke-width:1; }
-.pie-label { font-size:11px; font-weight:700; fill:#fff; text-anchor:middle; dominant-baseline:middle; pointer-events:none; }
+.pie-label-line { stroke:var(--muted-2); stroke-width:1.25; fill:none; }
+.pie-label { font-size:11px; font-weight:700; fill:var(--navy); text-anchor:middle; dominant-baseline:middle; pointer-events:none; }
 .pie-center-label { font-size:10px; fill:var(--muted); text-transform:uppercase; letter-spacing:.7px; text-anchor:middle; }
 .pie-center-value { font-size:22px; font-weight:700; fill:var(--navy); text-anchor:middle; }
 .pie-center-sub { font-size:11px; fill:var(--muted); text-anchor:middle; }
@@ -824,8 +825,8 @@ function buildPieChartMarkup(items, totalLabel, totalValue, formatter, valueKey 
   const total = items.reduce((sum, item) => sum + item[valueKey], 0) || 1;
   const cx = 180;
   const cy = 180;
-  const radius = 120;
-  const strokeWidth = 46;
+  const radius = 110;
+  const strokeWidth = 42;
   let angle = -90;
   const slices = items.map(item => {
     const portion = item[valueKey] / total;
@@ -833,10 +834,12 @@ function buildPieChartMarkup(items, totalLabel, totalValue, formatter, valueKey 
     const startAngle = angle;
     const endAngle = angle + sweep;
     const midAngle = startAngle + sweep / 2;
-    const labelPoint = polarToCartesian(cx, cy, radius, midAngle);
-    const labelRadius = radius - strokeWidth / 2;
-    const labelX = cx + labelRadius * Math.cos((midAngle - 90) * Math.PI / 180);
-    const labelY = cy + labelRadius * Math.sin((midAngle - 90) * Math.PI / 180);
+    const lineStart = polarToCartesian(cx, cy, radius + 4, midAngle);
+    const lineMid = polarToCartesian(cx, cy, radius + 18, midAngle);
+    const rightSide = Math.cos((midAngle - 90) * Math.PI / 180) >= 0;
+    const lineEndX = lineMid.x + (rightSide ? 14 : -14);
+    const labelX = lineEndX + (rightSide ? 12 : -12);
+    const labelY = lineMid.y;
     const percent = Math.round(portion * 100);
     angle = endAngle;
     return {
@@ -844,8 +847,10 @@ function buildPieChartMarkup(items, totalLabel, totalValue, formatter, valueKey 
       portion,
       percent,
       path: describeArc(cx, cy, radius, startAngle, endAngle),
+      linePath: `M ${lineStart.x} ${lineStart.y} L ${lineMid.x} ${lineMid.y} L ${lineEndX} ${lineMid.y}`,
       labelX,
       labelY,
+      labelAnchor: rightSide ? 'start' : 'end',
       tooltip: formatter(item, percent)
     };
   });
@@ -859,7 +864,8 @@ function buildPieChartMarkup(items, totalLabel, totalValue, formatter, valueKey 
           </path>
         `).join('')}
         <circle class="pie-hole" cx="${cx}" cy="${cy}" r="${radius - strokeWidth / 2}"></circle>
-        ${slices.map(item => item.percent > 0 ? `<text class="pie-label" x="${item.labelX}" y="${item.labelY}">${item.percent}%</text>` : '').join('')}
+        ${slices.map(item => item.percent > 0 ? `<path class="pie-label-line" d="${item.linePath}"></path>` : '').join('')}
+        ${slices.map(item => item.percent > 0 ? `<text class="pie-label" x="${item.labelX}" y="${item.labelY}" text-anchor="${item.labelAnchor}">${item.percent}%</text>` : '').join('')}
         <text class="pie-center-label" x="${cx}" y="${cy - 18}">${totalLabel}</text>
         <text class="pie-center-value" x="${cx}" y="${cy + 10}">${totalValue}</text>
         <text class="pie-center-sub" x="${cx}" y="${cy + 34}">${items.length} та сегмент</text>
