@@ -107,7 +107,7 @@ body {
 .type-cell .lbl { font-size:11px; color:var(--muted); }
 .type-cell .v { font-size:15px; font-weight:700; color:var(--navy); }
 .type-cell .s { font-size:11px; color:var(--muted); }
-.pie-layout { display:flex; justify-content:center; align-items:center; min-height:280px; }
+.pie-layout { display:grid; justify-items:center; gap:14px; min-height:280px; }
 .pie-svg { width:100%; max-width:360px; height:auto; overflow:visible; }
 .pie-slice { cursor:pointer; transition:opacity .15s ease, transform .15s ease; transform-origin:50% 50%; }
 .pie-slice:hover { opacity:.9; }
@@ -116,6 +116,34 @@ body {
 .pie-center-label { font-size:10px; fill:var(--muted); text-transform:uppercase; letter-spacing:.7px; text-anchor:middle; }
 .pie-center-value { font-size:22px; font-weight:700; fill:var(--navy); text-anchor:middle; }
 .pie-center-sub { font-size:11px; fill:var(--muted); text-anchor:middle; }
+.pie-inline-legend {
+  width:100%;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:8px 14px;
+}
+.pie-inline-item {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:#f8fafc;
+  color:var(--navy);
+  font-size:11px;
+  white-space:nowrap;
+}
+.pie-inline-item .sw {
+  width:12px;
+  height:12px;
+  border-radius:50%;
+  flex:0 0 auto;
+}
+.pie-inline-item .pct {
+  font-weight:700;
+}
 /* Funnel/stepper */
 .stepper { display:flex; flex-wrap:wrap; gap:6px; }
 .step { background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid var(--border); min-width:120px; flex:1; position:relative; }
@@ -836,6 +864,15 @@ function buildPieChartMarkup(items, totalLabel, totalValue, formatter, valueKey 
         <text class="pie-center-value" x="${cx}" y="${cy + 10}">${totalValue}</text>
         <text class="pie-center-sub" x="${cx}" y="${cy + 34}">${items.length} та сегмент</text>
       </svg>
+      <div class="pie-inline-legend">
+        ${slices.map(item => `
+          <div class="pie-inline-item" title="${item.label}: ${item.tooltip}">
+            <span class="sw" style="background:${item.color}"></span>
+            <span>${item.label}</span>
+            <span class="pct">${item.percent}%</span>
+          </div>
+        `).join('')}
+      </div>
     </div>
   `;
 }
