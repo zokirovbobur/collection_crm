@@ -24,7 +24,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_BASE_URL: /prototypes/trastbank-pmo/collection_crm/
+          VITE_BASE_URL: /prototypes/collection_crm/
 
       - name: Checkout zoboto repo
         uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
 
       - name: Sync built files
         run: |
-          DEST=zoboto/prototypes/trastbank-pmo/collection_crm
+          DEST=zoboto/prototypes/collection_crm
           rm -rf "$DEST"
           mkdir -p "$DEST"
           cp -r dist/. "$DEST/"
@@ -46,7 +46,7 @@ jobs:
           cd zoboto
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add prototypes/trastbank-pmo/collection_crm
+          git add prototypes/collection_crm
           git diff --cached --quiet && echo "No changes" && exit 0
           git commit -m "sync(collection_crm): auto-sync from collection_crm repo [${{ github.ref_name }}]"
           git push
