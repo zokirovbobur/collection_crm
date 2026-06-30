@@ -107,29 +107,15 @@ body {
 .type-cell .lbl { font-size:11px; color:var(--muted); }
 .type-cell .v { font-size:15px; font-weight:700; color:var(--navy); }
 .type-cell .s { font-size:11px; color:var(--muted); }
-.pie-layout { display:grid; grid-template-columns: 280px 1fr; gap:16px; align-items:center; }
-.pie-chart {
-  width:220px; height:220px; margin:0 auto; border-radius:50%;
-  background:#e4e8ee; position:relative;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
-}
-.pie-chart::after {
-  content:""; position:absolute; inset:28px; background:#fff; border-radius:50%;
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-.pie-chart .center {
-  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-  z-index:1; text-align:center; padding:0 40px;
-}
-.pie-chart .center .label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
-.pie-chart .center .value { font-size:22px; font-weight:700; color:var(--navy); line-height:1.1; margin-top:4px; }
-.pie-chart .center .sub { font-size:11px; color:var(--muted); margin-top:2px; }
-.pie-legend { display:grid; gap:8px; }
-.pie-legend .item { display:grid; grid-template-columns: 14px 1fr auto; gap:10px; align-items:center; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:#f8fafc; }
-.pie-legend .sw { width:14px; height:14px; border-radius:4px; }
-.pie-legend .name { font-size:12px; color:var(--navy); font-weight:600; }
-.pie-legend .meta { font-size:11px; color:var(--muted); margin-top:2px; }
-.pie-legend .val { text-align:right; font-size:12px; font-weight:700; color:var(--navy); }
+.pie-layout { display:flex; justify-content:center; align-items:center; min-height:280px; }
+.pie-svg { width:100%; max-width:360px; height:auto; overflow:visible; }
+.pie-slice { cursor:pointer; transition:opacity .15s ease, transform .15s ease; transform-origin:50% 50%; }
+.pie-slice:hover { opacity:.9; }
+.pie-hole { fill:#fff; stroke:var(--border); stroke-width:1; }
+.pie-label { font-size:11px; font-weight:700; fill:#fff; text-anchor:middle; dominant-baseline:middle; pointer-events:none; }
+.pie-center-label { font-size:10px; fill:var(--muted); text-transform:uppercase; letter-spacing:.7px; text-anchor:middle; }
+.pie-center-value { font-size:22px; font-weight:700; fill:var(--navy); text-anchor:middle; }
+.pie-center-sub { font-size:11px; fill:var(--muted); text-anchor:middle; }
 /* Funnel/stepper */
 .stepper { display:flex; flex-wrap:wrap; gap:6px; }
 .step { background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid var(--border); min-width:120px; flex:1; position:relative; }
@@ -351,8 +337,6 @@ table.data td.link { color:var(--court); font-weight:600; }
           <button class="btn primary">Янгилаш</button>
         </div>
       </div>
-      <div class="kpi-grid" id="kpiGrid"></div>
-
       <div class="charts-grid">
         <div class="card">
           <h3>Қарздорлик bucket тақсимоти <span class="hint">соннинг ва суммасининг улуши</span></h3>
@@ -420,6 +404,7 @@ table.data td.link { color:var(--court); font-weight:600; }
         <button class="btn primary" id="applyRegistryFilters" onclick="applyRegistryFilters({smooth:true})">Қўллаш</button>
         <button class="btn" id="resetRegistryFilters" onclick="resetRegistryFilters()">Тозалаш</button>
       </div>
+      <div class="kpi-grid" id="kpiGrid"></div>
       <div class="card">
         <h3>Кредитлар реестри <span class="hint" id="tableHint">— Барча шартномалар</span></h3>
         <div class="table-wrap" style="border:none;">
@@ -795,37 +780,62 @@ function fillSelect(id, opts, first="Барчаси"){
 const PIE_COLORS = ["#9aa3af","#E5A50A","#E67E22","#C0392B","#7b1d12","#7E3FBF","#2F6FDB","#123C69","#1E8449","#C8922A","#243759","#48a999"];
 const registryState = { kpiIndex: null, search: "" };
 
-function buildPieChartMarkup(items, totalLabel, totalValue, formatter){
-  const total = items.reduce((sum, item) => sum + item.value, 0) || 1;
-  let current = 0;
-  const slices = items.map((item, index) => {
-    const start = current / total * 360;
-    current += item.value;
-    const end = current / total * 360;
-    return `${item.color} ${start}deg ${end}deg`;
-  }).join(', ');
+function polarToCartesian(cx, cy, r, angle){
+  const rad = (angle - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function describeArc(cx, cy, r, startAngle, endAngle){
+  const start = polarToCartesian(cx, cy, r, endAngle);
+  const end = polarToCartesian(cx, cy, r, startAngle);
+  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
+}
+
+function buildPieChartMarkup(items, totalLabel, totalValue, formatter, valueKey = 'value'){
+  const total = items.reduce((sum, item) => sum + item[valueKey], 0) || 1;
+  const cx = 180;
+  const cy = 180;
+  const radius = 120;
+  const strokeWidth = 46;
+  let angle = -90;
+  const slices = items.map(item => {
+    const portion = item[valueKey] / total;
+    const sweep = portion * 360;
+    const startAngle = angle;
+    const endAngle = angle + sweep;
+    const midAngle = startAngle + sweep / 2;
+    const labelPoint = polarToCartesian(cx, cy, radius, midAngle);
+    const labelRadius = radius - strokeWidth / 2;
+    const labelX = cx + labelRadius * Math.cos((midAngle - 90) * Math.PI / 180);
+    const labelY = cy + labelRadius * Math.sin((midAngle - 90) * Math.PI / 180);
+    const percent = Math.round(portion * 100);
+    angle = endAngle;
+    return {
+      ...item,
+      portion,
+      percent,
+      path: describeArc(cx, cy, radius, startAngle, endAngle),
+      labelX,
+      labelY,
+      tooltip: formatter(item, percent)
+    };
+  });
 
   return `
     <div class="pie-layout">
-      <div class="pie-chart" style="background:conic-gradient(${slices})">
-        <div class="center">
-          <div class="label">${totalLabel}</div>
-          <div class="value">${totalValue}</div>
-          <div class="sub">${items.length} та сегмент</div>
-        </div>
-      </div>
-      <div class="pie-legend">
-        ${items.map(item => `
-          <div class="item">
-            <span class="sw" style="background:${item.color}"></span>
-            <div>
-              <div class="name">${item.label}</div>
-              <div class="meta">${formatter(item)}</div>
-            </div>
-            <div class="val">${Math.round(item.value / total * 100)}%</div>
-          </div>
+      <svg class="pie-svg" viewBox="0 0 360 360" role="img" aria-label="${totalLabel}">
+        ${slices.map(item => `
+          <path class="pie-slice" d="${item.path}" stroke="${item.color}" stroke-width="${strokeWidth}" fill="none" stroke-linecap="butt">
+            <title>${item.label}: ${item.tooltip}</title>
+          </path>
         `).join('')}
-      </div>
+        <circle class="pie-hole" cx="${cx}" cy="${cy}" r="${radius - strokeWidth / 2}"></circle>
+        ${slices.map(item => item.percent > 0 ? `<text class="pie-label" x="${item.labelX}" y="${item.labelY}">${item.percent}%</text>` : '').join('')}
+        <text class="pie-center-label" x="${cx}" y="${cy - 18}">${totalLabel}</text>
+        <text class="pie-center-value" x="${cx}" y="${cy + 10}">${totalValue}</text>
+        <text class="pie-center-sub" x="${cx}" y="${cy + 34}">${items.length} та сегмент</text>
+      </svg>
     </div>
   `;
 }
@@ -919,7 +929,8 @@ function renderBucketBars(){
     data,
     'Жами контракт',
     totalCount,
-    item => `${item.value.toLocaleString('ru-RU')} та • ${(item.amount/1e9).toFixed(2)} млрд сўм`
+    item => `${item.value.toLocaleString('ru-RU')} та • ${(item.amount/1e9).toFixed(2)} млрд сўм`,
+    'value'
   );
 }
 
@@ -935,7 +946,8 @@ function renderTypeGrid(){
     data,
     'Жами сумма',
     totalAmount,
-    item => `${item.count.toLocaleString('ru-RU')} та • ${(item.value/1e9).toFixed(2)} млрд сўм`
+    item => `${item.count.toLocaleString('ru-RU')} та • ${(item.value/1e9).toFixed(2)} млрд сўм`,
+    'value'
   );
 }
 
