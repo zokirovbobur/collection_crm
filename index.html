@@ -107,28 +107,27 @@ body {
 .type-cell .lbl { font-size:11px; color:var(--muted); }
 .type-cell .v { font-size:15px; font-weight:700; color:var(--navy); }
 .type-cell .s { font-size:11px; color:var(--muted); }
-.pie-layout { display:grid; justify-items:center; gap:14px; min-height:260px; }
-.pie-svg { width:100%; max-width:320px; height:auto; overflow:visible; }
-.pie-slice { cursor:pointer; transition:opacity .15s ease, transform .15s ease; transform-origin:50% 50%; }
-.pie-slice:hover { opacity:.9; }
-.pie-hole { fill:#fff; stroke:var(--border); stroke-width:1; }
-.pie-label-line { stroke:var(--muted-2); stroke-width:1.25; fill:none; }
-.pie-label { font-size:11px; font-weight:700; fill:var(--navy); text-anchor:middle; dominant-baseline:middle; pointer-events:none; }
-.pie-center-label { font-size:10px; fill:var(--muted); text-transform:uppercase; letter-spacing:.7px; text-anchor:middle; }
-.pie-center-value { font-size:22px; font-weight:700; fill:var(--navy); text-anchor:middle; }
-.pie-center-sub { font-size:11px; fill:var(--muted); text-anchor:middle; }
-.pie-inline-legend {
+/* Waffle chart */
+.waffle-layout { display:flex; flex-direction:column; align-items:center; gap:10px; padding:4px 0; }
+.waffle-info { text-align:center; }
+.waffle-total-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.7px; }
+.waffle-total-value { font-size:22px; font-weight:700; color:var(--navy); margin:2px 0; }
+.waffle-total-sub { font-size:11px; color:var(--muted); }
+.waffle-grid { display:grid; grid-template-columns:repeat(10,1fr); gap:3px; width:100%; max-width:280px; }
+.waffle-cell { aspect-ratio:1/1; border-radius:3px; cursor:default; transition:opacity .12s, transform .12s; }
+.waffle-cell:hover { opacity:.75; transform:scale(1.2); }
+.waffle-legend {
   width:100%;
   display:flex;
   flex-wrap:wrap;
   justify-content:center;
-  gap:8px 14px;
+  gap:6px 10px;
 }
-.pie-inline-item {
+.waffle-legend-item {
   display:flex;
   align-items:center;
-  gap:8px;
-  padding:6px 10px;
+  gap:6px;
+  padding:5px 9px;
   border:1px solid var(--border);
   border-radius:999px;
   background:#f8fafc;
@@ -136,15 +135,13 @@ body {
   font-size:11px;
   white-space:nowrap;
 }
-.pie-inline-item .sw {
-  width:12px;
-  height:12px;
-  border-radius:50%;
+.waffle-legend-item .sw {
+  width:10px;
+  height:10px;
+  border-radius:2px;
   flex:0 0 auto;
 }
-.pie-inline-item .pct {
-  font-weight:700;
-}
+.waffle-legend-item .pct { font-weight:700; }
 /* Funnel/stepper */
 .stepper { display:flex; flex-wrap:wrap; gap:6px; }
 .step { background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid var(--border); min-width:120px; flex:1; position:relative; }
@@ -373,7 +370,7 @@ table.data td.link { color:var(--court); font-weight:600; }
         </div>
         <div class="card">
           <h3>Кредит тури бўйича тақсимот</h3>
-          <div class="type-grid" id="typeGrid"></div>
+          <div id="typeGrid"></div>
         </div>
       </div>
 
@@ -821,6 +818,39 @@ function describeArc(cx, cy, r, startAngle, endAngle){
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
 }
 
+function buildWaffleChartMarkup(items, totalLabel, totalValue, formatter, valueKey = 'value'){
+  const total = items.reduce((sum, item) => sum + item[valueKey], 0) || 1;
+  const segs = items.map(item => {
+    const portion = item[valueKey] / total;
+    const percent = Math.round(portion * 100);
+    return { ...item, portion, percent, tooltip: formatter(item, percent), exactCells: portion * 100, cells: Math.floor(portion * 100) };
+  });
+  // Largest remainder to fill exactly 100 cells
+  let rem = 100 - segs.reduce((s, a) => s + a.cells, 0);
+  const order = segs.map((s, i) => ({ i, r: s.exactCells % 1 })).sort((a, b) => b.r - a.r);
+  for (let k = 0; k < rem; k++) segs[order[k].i].cells++;
+
+  const cellList = segs.flatMap(seg => Array.from({ length: seg.cells }, () => ({ color: seg.color, title: `${seg.label}: ${seg.tooltip}` })));
+  const gridHtml = cellList.map(c => `<div class="waffle-cell" style="background:${c.color}" title="${c.title}"></div>`).join('');
+  const legendHtml = segs.map(seg => `
+    <div class="waffle-legend-item" title="${seg.label}: ${seg.tooltip}">
+      <span class="sw" style="background:${seg.color}"></span>
+      <span>${seg.label}</span>
+      <span class="pct">${seg.percent}%</span>
+    </div>`).join('');
+
+  return `
+    <div class="waffle-layout">
+      <div class="waffle-info">
+        <div class="waffle-total-label">${totalLabel}</div>
+        <div class="waffle-total-value">${totalValue}</div>
+        <div class="waffle-total-sub">${items.length} та сегмент</div>
+      </div>
+      <div class="waffle-grid">${gridHtml}</div>
+      <div class="waffle-legend">${legendHtml}</div>
+    </div>`;
+}
+
 function buildPieChartMarkup(items, totalLabel, totalValue, formatter, valueKey = 'value'){
   const total = items.reduce((sum, item) => sum + item[valueKey], 0) || 1;
   const cx = 180;
@@ -968,7 +998,7 @@ function renderBucketBars(){
     color: PIE_COLORS[index % PIE_COLORS.length]
   }));
   const totalCount = data.reduce((sum, item) => sum + item.value, 0).toLocaleString('ru-RU');
-  document.getElementById('bucketBars').innerHTML = buildPieChartMarkup(
+  document.getElementById('bucketBars').innerHTML = buildWaffleChartMarkup(
     data,
     'Жами контракт',
     totalCount,
@@ -985,7 +1015,7 @@ function renderTypeGrid(){
     color: PIE_COLORS[index % PIE_COLORS.length]
   }));
   const totalAmount = `${(data.reduce((sum, item) => sum + item.value, 0) / 1e9).toFixed(2)} млрд`;
-  document.getElementById('typeGrid').innerHTML = buildPieChartMarkup(
+  document.getElementById('typeGrid').innerHTML = buildWaffleChartMarkup(
     data,
     'Жами сумма',
     totalAmount,
